@@ -25,7 +25,7 @@
 <header id="title">Nouvel utilisateur</header>
 <main>
 
-  <!-- ÉTAPE 1 : QR (AUCUN ID/TOKEN AFFICHÉ) -->
+  <!-- ÉTAPE 1 : QR -->
   <section id="step1" class="card center">
     <p class="muted">Ton QR personnel a été généré. Garde-le.</p>
     <img id="qr" class="qr" alt="QR Code" />
@@ -50,7 +50,7 @@
     </div>
   </section>
 
-  <!-- MON COMPTE (AUCUN ID/TOKEN AFFICHÉ) -->
+  <!-- MON COMPTE -->
   <section id="account" class="hidden">
     <div class="card">
       <h2 style="margin:0 0 8px 0" id="accName">Mon compte</h2>
@@ -68,7 +68,6 @@
 </main>
 
 <script>
-const API = ""; // même origine (app.js sert /public)
 const $ = s => document.querySelector(s);
 
 const title = $("#title");
@@ -91,7 +90,7 @@ const accEmail = $("#accEmail");
 const accQr    = $("#accQr");
 const btnLogout = $("#btnLogout");
 
-// On garde seulement l'id en local (utilisation interne, jamais affiché)
+// garder id en local
 let state = { id: localStorage.getItem("id") };
 
 init().catch(console.error);
@@ -107,7 +106,7 @@ async function init(){
 async function startOnboarding(){
   title.textContent = "Nouvel utilisateur";
   showOnly(step1);
-  const r = await fetch(API + "/start", { method:"POST" });
+  const r = await fetch("/api/start", { method:"POST" });
   const data = await r.json();
   state.id = data.id;
   localStorage.setItem("id", state.id);
@@ -123,8 +122,8 @@ next1.addEventListener("click", ()=>{
 
 next2.addEventListener("click", async ()=>{
   const email = emailInput.value.trim();
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { alert("Email invalide"); return; }
-  await fetch(API + "/email", {
+  if (!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)) { alert("Email invalide"); return; }
+  await fetch("/api/email", {
     method:"PUT",
     headers:{ "Content-Type":"application/json" },
     body: JSON.stringify({ id: state.id, email })
@@ -137,7 +136,7 @@ next2.addEventListener("click", async ()=>{
 finishBtn.addEventListener("click", async ()=>{
   const pseudo = (pseudoInput.value || "").trim();
   if (!pseudo) { alert("Entre un pseudo"); return; }
-  await fetch(API + "/pseudo", {
+  await fetch("/api/pseudo", {
     method:"PUT",
     headers:{ "Content-Type":"application/json" },
     body: JSON.stringify({ id: state.id, pseudo })
@@ -153,12 +152,12 @@ btnLogout.addEventListener("click", ()=>{
 async function showAccount(id){
   title.textContent = "Mon compte";
   showOnly(account);
-  const r = await fetch(API + "/api/profile/" + encodeURIComponent(id));
+  const r = await fetch("/api/profile?id=" + encodeURIComponent(id));
   if (!r.ok) { alert("Profil introuvable"); return; }
   const { user } = await r.json();
   accName.textContent  = user.pseudo || "Mon compte";
   accEmail.textContent = "Email : " + (user.email || "(non fourni)");
-  accQr.src = `/qr/${encodeURIComponent(user.id)}.png`;
+  accQr.src = "/api/qr?id=" + encodeURIComponent(user.id);
 }
 
 function showOnly(section){
