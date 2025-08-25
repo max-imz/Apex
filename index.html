@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+<title>Onboarding + Compte</title>
+<style>
+  :root{--pad:16px;--radius:14px;--border:#e6e6e6}
+  *{box-sizing:border-box}
+  body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;margin:0;background:#fafafa;color:#111}
+  header{padding:var(--pad);text-align:center;font-weight:700;border-bottom:1px solid var(--border);background:#fff}
+  main{max-width:780px;margin:0 auto;padding:var(--pad)}
+  .card{background:#fff;border:1px solid var(--border);border-radius:var(--radius);padding:var(--pad);box-shadow:0 1px 3px rgba(0,0,0,.04);margin-bottom:12px}
+  .center{display:flex;flex-direction:column;align-items:center;gap:16px}
+  .muted{color:#666}
+  input{width:100%;padding:12px;border:1px solid var(--border);border-radius:12px}
+  button{appearance:none;border:0;border-radius:12px;padding:12px 18px;font-weight:600;background:#111;color:#fff}
+  button:disabled{opacity:.6}
+  img.qr{width:min(320px,80vw);border:1px solid var(--border);border-radius:12px;background:#fff}
+  .hidden{display:none !important}
+  .row{display:flex;gap:12px;align-items:center}
+</style>
+</head>
+<body>
+<header id="title">Nouvel utilisateur</header>
+<main>
+
+  <!-- ÉTAPE 1 : QR -->
+  <section id="step1" class="card center">
+    <p class="muted">Ton QR personnel a été généré. Garde-le.</p>
+    <img id="qr" class="qr" alt="QR Code" />
+    <button id="next1" disabled>Suivant</button>
+  </section>
+
+  <!-- ÉTAPE 2 : Email -->
+  <section id="step2" class="card hidden">
+    <h3>Entre ton e-mail</h3>
+    <input id="email" type="email" placeholder="exemple@gmail.com" />
+    <div style="margin-top:12px;display:flex;justify-content:flex-end">
+      <button id="next2">Suivant</button>
+    </div>
+  </section>
+
+  <!-- ÉTAPE 3 : Pseudo -->
+  <section id="step3" class="card hidden">
+    <h3>Choisis un pseudo</h3>
+    <input id="pseudo" type="text" placeholder="Ton pseudo" />
+    <div style="margin-top:12px;display:flex;justify-content:flex-end">
+      <button id="finish">Terminer</button>
+    </div>
+  </section>
+
+  <!-- MON COMPTE -->
+  <section id="account" class="hidden">
+    <div class="card">
+      <h2 style="margin:0 0 8px 0" id="accName">Mon compte</h2>
+      <div class="muted" id="accEmail">Email : </div>
+    </div>
+    <div class="card center">
+      <img id="accQr" class="qr" alt="Mon QR" />
+      <div class="muted">Scanne ce QR pour ouvrir ton profil depuis un autre appareil.</div>
+    </div>
+    <div class="card row">
+      <button id="btnLogout" style="background:#c62828">Réinitialiser (déconnexion)</button>
+    </div>
+  </section>
+
+</main>
+
+<script>
+const $ = s => document.querySelector(s);
+
+const title = $("#title");
+const step1 = $("#step1");
+const step2 = $("#step2");
+const step3 = $("#step3");
+const account = $("#account");
+
+const qr = $("#qr");
+const next1 = $("#next1");
+
+const emailInput = $("#email");
+const next2 = $("#next2");
+
+const pseudoInput = $("#pseudo");
+const finishBtn = $("#finish");
+
+const accName  = $("#accName");
+const accEmail = $("#accEmail");
+const accQr    = $("#accQr");
+const btnLogout = $("#btnLogout");
+
+// garder id en local
+let state = { id: localStorage.getItem("id") };
+
+init().catch(console.error);
+
+async function init(){
+  if (state.id) {
+    await showAccount(state.id);
+    return;
+  }
+  await startOnboarding();
+}
+
+async function startOnboarding(){
+  title.textContent = "Nouvel utilisateur";
+  showOnly(step1);
+  const r = await fetch("/api/start", { method:"POST" });
+  const data = await r.json();
+  state.id = data.id;
+  localStorage.setItem("id", state.id);
+  qr.src = data.qrPngBase64;
+  next1.disabled = false;
+}
+
+next1.addEventListener("click", ()=>{
+  title.textContent = "Ton e-mail";
+  showOnly(step2);
+  emailInput.focus();
+});
+
+next2.addEventListener("click", async ()=>{
+  const email = emailInput.value.trim();
+  if (!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)) { alert("Email invalide"); return; }
+  await fetch("/api/email", {
+    method:"PUT",
+    headers:{ "Content-Type":"application/json" },
+    body: JSON.stringify({ id: state.id, email })
+  });
+  title.textContent = "Ton pseudo";
+  showOnly(step3);
+  pseudoInput.focus();
+});
+
+finishBtn.addEventListener("click", async ()=>{
+  const pseudo = (pseudoInput.value || "").trim();
+  if (!pseudo) { alert("Entre un pseudo"); return; }
+  await fetch("/api/pseudo", {
+    method:"PUT",
+    headers:{ "Content-Type":"application/json" },
+    body: JSON.stringify({ id: state.id, pseudo })
+  });
+  await showAccount(state.id);
+});
+
+btnLogout.addEventListener("click", ()=>{
+  localStorage.removeItem("id");
+  location.reload();
+});
+
+async function showAccount(id){
+  title.textContent = "Mon compte";
+  showOnly(account);
+  const r = await fetch("/api/profile?id=" + encodeURIComponent(id));
+  if (!r.ok) { alert("Profil introuvable"); return; }
+  const { user } = await r.json();
+  accName.textContent  = user.pseudo || "Mon compte";
+  accEmail.textContent = "Email : " + (user.email || "(non fourni)");
+  accQr.src = "/api/qr?id=" + encodeURIComponent(user.id);
+}
+
+function showOnly(section){
+  [step1,step2,step3,account].forEach(s => s.classList.add("hidden"));
+  section.classList.remove("hidden");
+}
+</script>
+</body>
+</html>

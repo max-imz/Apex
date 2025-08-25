@@ -1,0 +1,12 @@
+{
+  "name": "onboard-app",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "start": "vercel dev"
+  },
+  "dependencies": {
+    "nanoid": "^5.1.5",
+    "qrcode": "^1.5.4"
+  }
+}
